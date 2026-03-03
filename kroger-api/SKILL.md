@@ -1,0 +1,80 @@
+---
+name: kroger-api
+description: >-
+  Interact with the Kroger Public API. Use when the user wants to search
+  Kroger products, find store locations, view chains or departments, add
+  items to a Kroger shopping cart, or access an authenticated customer
+  profile. Handles OAuth2 authentication (client credentials and authorization
+  code with PKCE), product search and detail lookup, location and store
+  search, chain and department lookup, cart management, and identity profile
+  retrieval. Covers all public Kroger API endpoints.
+argument-hint: "<auth|products|locations|cart|identity> [subcommand] [args]"
+allowed-tools: Bash(dotnet run *), Read
+---
+# Kroger API
+
+Interact with all endpoints of the Kroger Public API. Read `references/api-ref.md`
+for the full endpoint reference, and `references/auth-guide.md` for OAuth2 details.
+
+## Argument Parsing
+
+Parse `$ARGUMENTS` — the first token routes to a script:
+
+| First Token  | Script                 | Description                              |
+|--------------|------------------------|------------------------------------------|
+| `auth`       | `scripts/auth.cs`      | Token acquisition and management         |
+| `products`   | `scripts/products.cs`  | Product search and detail lookup         |
+| `locations`  | `scripts/locations.cs` | Store, chain, and department lookup      |
+| `cart`       | `scripts/cart.cs`      | Add items to an authenticated cart       |
+| `identity`   | `scripts/identity.cs`  | Authenticated customer profile           |
+
+If no arguments or unrecognized first token, show this usage summary and stop.
+
+## First-Time Setup
+
+Read `references/auth-guide.md` and guide the user through setup. Required credentials:
+
+```bash
+dotnet user-secrets set "KrogerClientId"     "YOUR_CLIENT_ID"     --id kroger-api-secrets
+dotnet user-secrets set "KrogerClientSecret" "YOUR_CLIENT_SECRET" --id kroger-api-secrets
+dotnet user-secrets set "KrogerRedirectUri"  "YOUR_REDIRECT_URI"  --id kroger-api-secrets
+```
+
+Register at https://developer.kroger.com to obtain credentials.
+
+## Operations
+
+### Auth
+```
+dotnet run scripts/auth.cs -- $ARGUMENTS
+```
+Subcommands: `client [scope]`, `url [--scope <s>]`, `exchange <code>`, `refresh`, `status`
+
+### Products
+```
+dotnet run scripts/products.cs -- $ARGUMENTS
+```
+Subcommands: `search <term>`, `get <productId>`
+
+### Locations
+```
+dotnet run scripts/locations.cs -- $ARGUMENTS
+```
+Subcommands: `search`, `get <id>`, `chains`, `chain <name>`, `departments`, `department <id>`
+
+### Cart
+```
+dotnet run scripts/cart.cs -- $ARGUMENTS
+```
+Subcommands: `add <upc> <qty> [--modality DELIVERY|PICKUP]`
+
+### Identity
+```
+dotnet run scripts/identity.cs -- $ARGUMENTS
+```
+Subcommands: `profile`
+
+## Reference Files
+
+- `references/api-ref.md` — Full endpoint reference, parameters, and rate limits
+- `references/auth-guide.md` — OAuth2 flows, scopes, and token management
