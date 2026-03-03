@@ -124,8 +124,7 @@ async Task<int> Get(string accessToken, string url)
     }
 
     Console.WriteLine(JsonSerializer.Serialize(
-        JsonSerializer.Deserialize<JsonElement>(json),
-        new JsonSerializerOptions { WriteIndented = true }));
+        JsonSerializer.Deserialize<JsonElement>(json, JsonOpts), JsonOpts));
     return 0;
 }
 
@@ -137,7 +136,7 @@ async Task<string?> GetOrRefreshClientToken()
         return null;
     }
 
-    var stored = JsonSerializer.Deserialize<TokenResponse>(await File.ReadAllTextAsync(clientTokenFile))!;
+    var stored = JsonSerializer.Deserialize<TokenResponse>(await File.ReadAllTextAsync(clientTokenFile), JsonOpts)!;
     if (DateTime.UtcNow < stored.ExpiresAt)
         return stored.AccessToken;
 
@@ -160,12 +159,12 @@ async Task<string?> GetOrRefreshClientToken()
     }
 
     var json  = await response.Content.ReadAsStringAsync();
-    var token = JsonSerializer.Deserialize<TokenResponse>(json)!;
+    var token = JsonSerializer.Deserialize<TokenResponse>(json, JsonOpts)!;
     token.ExpiresAt = DateTime.UtcNow.AddSeconds(token.ExpiresIn - 60);
 
     Directory.CreateDirectory(Path.GetDirectoryName(clientTokenFile)!);
     await File.WriteAllTextAsync(clientTokenFile,
-        JsonSerializer.Serialize(token, new JsonSerializerOptions { WriteIndented = true }));
+        JsonSerializer.Serialize(token, JsonOpts));
 
     return token.AccessToken;
 }

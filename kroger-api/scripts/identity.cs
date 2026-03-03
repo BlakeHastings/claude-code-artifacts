@@ -60,8 +60,7 @@ async Task<int> GetProfile()
     }
 
     Console.WriteLine(JsonSerializer.Serialize(
-        JsonSerializer.Deserialize<JsonElement>(json),
-        new JsonSerializerOptions { WriteIndented = true }));
+        JsonSerializer.Deserialize<JsonElement>(json, JsonOpts), JsonOpts));
     return 0;
 }
 
@@ -89,7 +88,7 @@ async Task<string?> GetOrRefreshUserToken()
         return null;
     }
 
-    var stored = JsonSerializer.Deserialize<TokenResponse>(await File.ReadAllTextAsync(userTokenFile))!;
+    var stored = JsonSerializer.Deserialize<TokenResponse>(await File.ReadAllTextAsync(userTokenFile), JsonOpts)!;
     if (DateTime.UtcNow < stored.ExpiresAt)
         return stored.AccessToken;
 
@@ -119,12 +118,12 @@ async Task<string?> GetOrRefreshUserToken()
     }
 
     var json  = await response.Content.ReadAsStringAsync();
-    var token = JsonSerializer.Deserialize<TokenResponse>(json)!;
+    var token = JsonSerializer.Deserialize<TokenResponse>(json, JsonOpts)!;
     token.ExpiresAt = DateTime.UtcNow.AddSeconds(token.ExpiresIn - 60);
 
     Directory.CreateDirectory(Path.GetDirectoryName(userTokenFile)!);
     await File.WriteAllTextAsync(userTokenFile,
-        JsonSerializer.Serialize(token, new JsonSerializerOptions { WriteIndented = true }));
+        JsonSerializer.Serialize(token, JsonOpts));
 
     return token.AccessToken;
 }

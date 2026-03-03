@@ -46,31 +46,31 @@ Register at https://developer.kroger.com to obtain credentials.
 
 ### Auth
 ```
-dotnet run scripts/auth.cs -- $ARGUMENTS
+dotnet run scripts/auth.cs -- $2 $3 $4 $5 $6 $7
 ```
-Subcommands: `client [scope]`, `url [--scope <s>]`, `exchange <code>`, `refresh`, `status`
+Subcommands: `client [scope]`, `login`, `url [--scope <s>]`, `exchange <code>`, `refresh`, `status`
 
 ### Products
 ```
-dotnet run scripts/products.cs -- $ARGUMENTS
+dotnet run scripts/products.cs -- $2 $3 $4 $5 $6 $7
 ```
 Subcommands: `search <term>`, `get <productId>`
 
 ### Locations
 ```
-dotnet run scripts/locations.cs -- $ARGUMENTS
+dotnet run scripts/locations.cs -- $2 $3 $4 $5 $6 $7
 ```
 Subcommands: `search`, `get <id>`, `chains`, `chain <name>`, `departments`, `department <id>`
 
 ### Cart
 ```
-dotnet run scripts/cart.cs -- $ARGUMENTS
+dotnet run scripts/cart.cs -- $2 $3 $4 $5 $6 $7
 ```
-Subcommands: `add <upc> <qty> [--modality DELIVERY|PICKUP]`
+Subcommands: `add <items...> [--modality DELIVERY|PICKUP]`
 
 ### Identity
 ```
-dotnet run scripts/identity.cs -- $ARGUMENTS
+dotnet run scripts/identity.cs -- $2 $3 $4 $5 $6 $7
 ```
 Subcommands: `profile`
 
