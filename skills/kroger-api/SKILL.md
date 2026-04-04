@@ -32,15 +32,15 @@ If no arguments or unrecognized first token, show this usage summary and stop.
 
 ## First-Time Setup
 
-Read `references/auth-guide.md` and guide the user through setup. Required credentials:
+Read `references/auth-guide.md` and guide the user through setup. Register at
+https://developer.kroger.com to obtain credentials, then run:
 
-```bash
-dotnet user-secrets set "KrogerClientId"     "YOUR_CLIENT_ID"     --id kroger-api-secrets
-dotnet user-secrets set "KrogerClientSecret" "YOUR_CLIENT_SECRET" --id kroger-api-secrets
-dotnet user-secrets set "KrogerRedirectUri"  "YOUR_REDIRECT_URI"  --id kroger-api-secrets
+```
+auth setup
 ```
 
-Register at https://developer.kroger.com to obtain credentials.
+This interactive command stores all credentials in the OS credential store
+(Windows Credential Manager / macOS Keychain / Linux Secret Service) — never plaintext.
 
 ## Operations
 
@@ -48,7 +48,7 @@ Register at https://developer.kroger.com to obtain credentials.
 ```
 dotnet run scripts/auth.cs -- $2 $3 $4 $5 $6 $7
 ```
-Subcommands: `client [scope]`, `login`, `url [--scope <s>]`, `exchange <code>`, `refresh`, `status`
+Subcommands: `setup`, `client [scope]`, `login`, `url [--scope <s>]`, `exchange <code>`, `refresh`, `status`
 
 ### Products
 ```

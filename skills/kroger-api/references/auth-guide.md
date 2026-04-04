@@ -98,24 +98,19 @@ PKCE (Proof Key for Code Exchange) prevents authorization code interception atta
 
 ## Token Storage
 
-Tokens are persisted to `~/.kroger-api/`:
+Tokens are stored in the OS credential store via `Devlooped.CredentialManager` — never in plaintext files.
 
-| File                  | Contains                                         |
-|-----------------------|--------------------------------------------------|
-| `client-token.json`   | Client credentials access token + expiry         |
-| `user-token.json`     | User access token + refresh token + expiry       |
+| Key             | Account  | Contains                                    |
+|-----------------|----------|---------------------------------------------|
+| `client-token`  | `kroger` | Client credentials access token + expiry    |
+| `user-token`    | `kroger` | User access token + refresh token + expiry  |
 
-Token format:
-```json
-{
-  "access_token": "...",
-  "token_type": "Bearer",
-  "expires_in": 1800,
-  "refresh_token": "...",
-  "scope": "cart.basic:write profile.compact",
-  "expires_at": "2024-01-01T12:00:00Z"
-}
-```
+The credential store used depends on the OS:
+- **Windows**: Windows Credential Manager
+- **macOS**: Keychain
+- **Linux**: Secret Service API (GNOME Keyring / KWallet); requires a running secrets daemon
+
+Token values are stored as serialized JSON in the credential's password field.
 
 ---
 
@@ -130,19 +125,14 @@ Token format:
 
 ## Credential Setup
 
-Store credentials securely with dotnet user-secrets:
+All credentials are stored in the OS credential store via `Devlooped.CredentialManager`. Run the interactive setup command:
 
-```bash
-# Store credentials
-dotnet user-secrets set "KrogerClientId"     "YOUR_CLIENT_ID"     --id kroger-api-secrets
-dotnet user-secrets set "KrogerClientSecret" "YOUR_CLIENT_SECRET" --id kroger-api-secrets
-dotnet user-secrets set "KrogerRedirectUri"  "YOUR_REDIRECT_URI"  --id kroger-api-secrets
-
-# Verify
-dotnet user-secrets list --id kroger-api-secrets
-
-# Update a value
-dotnet user-secrets set "KrogerClientId" "NEW_VALUE" --id kroger-api-secrets
+```
+auth setup
 ```
 
+This prompts for your Client ID, Client Secret, and Redirect URI, then saves them securely. No plaintext files are written.
+
 Obtain credentials by registering an app at https://developer.kroger.com.
+
+To re-run setup at any time (e.g., to rotate secrets), simply run `auth setup` again — it overwrites existing values.

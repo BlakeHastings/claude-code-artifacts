@@ -1,3 +1,4 @@
+#:package Devlooped.CredentialManager@*
 #:package Microsoft.Extensions.Configuration@*
 #:package Microsoft.Extensions.Configuration.UserSecrets@*
 
@@ -8,26 +9,18 @@ using System.Text;
 using System.Text.Json;
 using System.Text.Json.Serialization;
 using System.Text.Json.Serialization.Metadata;
+using GitCredentialManager;
 using Microsoft.Extensions.Configuration;
 
-var config = new ConfigurationBuilder()
-    .AddUserSecrets("kroger-api-secrets")
+// ── Credential resolution ──────────────────────────────────────────────────────
+
+const string UserSecretsId = "a4f2e8b1-3c7d-4a9e-b5f0-1d2c3e4f5a6b";
+const string BaseUrl       = "https://api.kroger.com";
+
+var store   = CredentialManager.Create("kroger-api");
+var secrets = new ConfigurationBuilder()
+    .AddUserSecrets(UserSecretsId)
     .Build();
-
-var clientId = config["KrogerClientId"]
-    ?? throw new InvalidOperationException(
-        "KrogerClientId not configured.\nRun: dotnet user-secrets set \"KrogerClientId\" \"value\" --id kroger-api-secrets");
-var clientSecret = config["KrogerClientSecret"]
-    ?? throw new InvalidOperationException(
-        "KrogerClientSecret not configured.\nRun: dotnet user-secrets set \"KrogerClientSecret\" \"value\" --id kroger-api-secrets");
-var redirectUri = config["KrogerRedirectUri"] ?? "http://localhost/callback";
-
-const string BaseUrl = "https://api.kroger.com";
-
-var tokenDir = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.UserProfile), ".kroger-api");
-Directory.CreateDirectory(tokenDir);
-var clientTokenFile = Path.Combine(tokenDir, "client-token.json");
-var userTokenFile   = Path.Combine(tokenDir, "user-token.json");
 
 var JsonOpts = new JsonSerializerOptions
 {
@@ -35,7 +28,39 @@ var JsonOpts = new JsonSerializerOptions
     WriteIndented    = true,
 };
 
+string? Resolve(string envVar, string secretKey, string storeKey) =>
+    Environment.GetEnvironmentVariable(envVar)
+    ?? secrets[secretKey]
+    ?? store.Get($"{BaseUrl}/{storeKey}", "kroger")?.Password;
+
+var clientId     = Resolve("KROGER_CLIENT_ID",     "Kroger:ClientId",     "client-id");
+var clientSecret = Resolve("KROGER_CLIENT_SECRET", "Kroger:ClientSecret", "client-secret");
+var redirectUri  = Resolve("KROGER_REDIRECT_URI",  "Kroger:RedirectUri",  "redirect-uri")
+                   ?? "http://localhost/callback";
+
+void SaveToken(string key, TokenResponse token) =>
+    store.AddOrUpdate($"{BaseUrl}/{key}", "kroger", JsonSerializer.Serialize(token, JsonOpts));
+
+TokenResponse? LoadToken(string key)
+{
+    var json = store.Get($"{BaseUrl}/{key}", "kroger")?.Password;
+    return json is null ? null : JsonSerializer.Deserialize<TokenResponse>(json, JsonOpts);
+}
+
+// ── Routing ────────────────────────────────────────────────────────────────────
+
 if (args.Length == 0) return PrintUsage();
+
+// Commands that don't need credentials
+if (args[0].ToLower() == "setup")  return Setup();
+if (args[0].ToLower() == "status") return ShowStatus();
+
+// All other commands require configured credentials
+if (clientId == null || clientSecret == null)
+{
+    Console.Error.WriteLine("Kroger credentials not configured. Run: auth setup");
+    return 1;
+}
 
 return args[0].ToLower() switch
 {
@@ -44,11 +69,42 @@ return args[0].ToLower() switch
     "url"      => GenerateAuthUrl(),
     "exchange" => await ExchangeCode(),
     "refresh"  => await RefreshUserToken(),
-    "status"   => ShowStatus(),
     _          => PrintUsage()
 };
 
 // ── Subcommands ────────────────────────────────────────────────────────────────
+
+int Setup()
+{
+    Console.WriteLine("Kroger API Credential Setup");
+    Console.WriteLine("Register your app at https://developer.kroger.com\n");
+
+    Console.Write("Client ID: ");
+    var id = Console.ReadLine()?.Trim() ?? "";
+
+    var secret = ReadHidden("Client Secret: ");
+
+    Console.Write("Redirect URI [http://localhost:8080/callback]: ");
+    var uri = Console.ReadLine()?.Trim();
+    if (string.IsNullOrEmpty(uri)) uri = "http://localhost:8080/callback";
+
+    if (string.IsNullOrEmpty(id) || string.IsNullOrEmpty(secret))
+    {
+        Console.Error.WriteLine("Client ID and secret are required.");
+        return 1;
+    }
+
+    store.AddOrUpdate($"{BaseUrl}/client-id",     "kroger", id);
+    store.AddOrUpdate($"{BaseUrl}/client-secret", "kroger", secret);
+    store.AddOrUpdate($"{BaseUrl}/redirect-uri",  "kroger", uri);
+
+    Console.WriteLine("\nCredentials saved to system credential store.");
+    Console.WriteLine($"  Redirect URI: {uri}");
+    Console.WriteLine("\nNext steps:");
+    Console.WriteLine("  auth client product.compact   — get a client credentials token");
+    Console.WriteLine("  auth login                    — authenticate as a user");
+    return 0;
+}
 
 async Task<int> ClientCredentials()
 {
@@ -73,12 +129,11 @@ async Task<int> ClientCredentials()
 
     var token = JsonSerializer.Deserialize<TokenResponse>(json, JsonOpts)!;
     token.ExpiresAt = DateTime.UtcNow.AddSeconds(token.ExpiresIn - 60);
-    await WriteToken(clientTokenFile, token);
+    SaveToken("client-token", token);
 
     Console.WriteLine($"Client credentials token acquired.");
     Console.WriteLine($"  Scope:   {token.Scope}");
     Console.WriteLine($"  Expires: {token.ExpiresAt:u}");
-    Console.WriteLine($"  Saved:   {clientTokenFile}");
     return 0;
 }
 
@@ -90,13 +145,12 @@ async Task<int> LoginFlow()
     var state = Guid.NewGuid().ToString("N")[..16];
 
     var authUrl = $"{BaseUrl}/v1/connect/oauth2/authorize"
-                + $"?client_id={Uri.EscapeDataString(clientId)}"
+                + $"?client_id={Uri.EscapeDataString(clientId!)}"
                 + $"&redirect_uri={Uri.EscapeDataString(localRedirectUri)}"
                 + $"&response_type=code"
                 + $"&scope={Uri.EscapeDataString(scope)}"
                 + $"&state={state}";
 
-    // Start listener before opening the browser so we don't miss the redirect
     using var listener = new HttpListener();
     listener.Prefixes.Add($"http://localhost:{port}/");
     try
@@ -115,7 +169,6 @@ async Task<int> LoginFlow()
     Console.WriteLine($"Opening browser... (waiting up to 2 minutes)");
     Process.Start(new ProcessStartInfo(authUrl) { UseShellExecute = true });
 
-    // Wait for Kroger to redirect back
     using var cts = new CancellationTokenSource(TimeSpan.FromMinutes(2));
     HttpListenerContext ctx;
     try
@@ -130,7 +183,6 @@ async Task<int> LoginFlow()
         return 1;
     }
 
-    // Parse the callback query string
     var query = ctx.Request.Url?.Query?.TrimStart('?') ?? "";
     var qs = query.Split('&', StringSplitOptions.RemoveEmptyEntries)
         .Select(p => p.Split('=', 2))
@@ -140,7 +192,6 @@ async Task<int> LoginFlow()
     var code  = qs.GetValueOrDefault("code");
     var error = qs.GetValueOrDefault("error");
 
-    // Send a response to the browser so the tab doesn't hang
     var html = code != null
         ? "<html><body style='font-family:sans-serif;padding:2em'><h2>✓ Authorized</h2><p>You can close this tab and return to your terminal.</p></body></html>"
         : $"<html><body style='font-family:sans-serif;padding:2em'><h2>✗ Authorization failed</h2><p>{error}</p></body></html>";
@@ -167,7 +218,6 @@ async Task<int> LoginFlow()
         return 1;
     }
 
-    // Exchange code for tokens
     Console.WriteLine("Code received. Exchanging for token...");
     using var http = new HttpClient();
     http.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue(
@@ -189,9 +239,9 @@ async Task<int> LoginFlow()
 
     var token = JsonSerializer.Deserialize<TokenResponse>(json, JsonOpts)!;
     token.ExpiresAt = DateTime.UtcNow.AddSeconds(token.ExpiresIn - 60);
-    await WriteToken(userTokenFile, token);
+    SaveToken("user-token", token);
 
-    Console.WriteLine("User token acquired and saved.");
+    Console.WriteLine("User token acquired and saved to credential store.");
     Console.WriteLine($"  Scope:       {token.Scope}");
     Console.WriteLine($"  Expires:     {token.ExpiresAt:u}");
     Console.WriteLine($"  Has Refresh: {(token.RefreshToken != null ? "yes" : "no")}");
@@ -204,7 +254,7 @@ int GenerateAuthUrl()
     var state = GetArg("--state") ?? Guid.NewGuid().ToString("N")[..8];
 
     var url = $"{BaseUrl}/v1/connect/oauth2/authorize"
-            + $"?client_id={Uri.EscapeDataString(clientId)}"
+            + $"?client_id={Uri.EscapeDataString(clientId!)}"
             + $"&redirect_uri={Uri.EscapeDataString(redirectUri)}"
             + $"&response_type=code"
             + $"&scope={Uri.EscapeDataString(scope)}"
@@ -253,7 +303,7 @@ async Task<int> ExchangeCode()
 
     var token = JsonSerializer.Deserialize<TokenResponse>(json, JsonOpts)!;
     token.ExpiresAt = DateTime.UtcNow.AddSeconds(token.ExpiresIn - 60);
-    await WriteToken(userTokenFile, token);
+    SaveToken("user-token", token);
 
     Console.WriteLine("User token acquired and saved.");
     Console.WriteLine($"  Scope:       {token.Scope}");
@@ -264,14 +314,14 @@ async Task<int> ExchangeCode()
 
 async Task<int> RefreshUserToken()
 {
-    if (!File.Exists(userTokenFile))
+    var stored = LoadToken("user-token");
+    if (stored == null)
     {
         Console.Error.WriteLine("No user token found. Run: auth url  →  auth exchange <code>");
         return 1;
     }
 
-    var existing = JsonSerializer.Deserialize<TokenResponse>(await File.ReadAllTextAsync(userTokenFile))!;
-    if (existing.RefreshToken == null)
+    if (stored.RefreshToken == null)
     {
         Console.Error.WriteLine("No refresh token available. Re-authorize: auth url");
         return 1;
@@ -284,7 +334,7 @@ async Task<int> RefreshUserToken()
     var response = await http.PostAsync($"{BaseUrl}/v1/connect/oauth2/token",
         new FormUrlEncodedContent([
             new("grant_type", "refresh_token"),
-            new("refresh_token", existing.RefreshToken),
+            new("refresh_token", stored.RefreshToken),
         ]));
 
     var json = await response.Content.ReadAsStringAsync();
@@ -296,7 +346,7 @@ async Task<int> RefreshUserToken()
 
     var token = JsonSerializer.Deserialize<TokenResponse>(json, JsonOpts)!;
     token.ExpiresAt = DateTime.UtcNow.AddSeconds(token.ExpiresIn - 60);
-    await WriteToken(userTokenFile, token);
+    SaveToken("user-token", token);
 
     Console.WriteLine($"User token refreshed. New expiry: {token.ExpiresAt:u}");
     return 0;
@@ -304,15 +354,19 @@ async Task<int> RefreshUserToken()
 
 int ShowStatus()
 {
-    Console.WriteLine("=== Kroger API Token Status ===\n");
+    Console.WriteLine("=== Kroger API Status ===\n");
 
-    if (File.Exists(clientTokenFile))
+    var isConfigured = clientId != null && clientSecret != null;
+    Console.WriteLine($"App Credentials : {(isConfigured ? "CONFIGURED" : "NOT CONFIGURED  (run: auth setup)")}");
+    Console.WriteLine();
+
+    var clientToken = LoadToken("client-token");
+    if (clientToken != null)
     {
-        var t = JsonSerializer.Deserialize<TokenResponse>(File.ReadAllText(clientTokenFile), JsonOpts)!;
-        var expired = DateTime.UtcNow > t.ExpiresAt;
+        var expired = DateTime.UtcNow > clientToken.ExpiresAt;
         Console.WriteLine($"Client Token : {(expired ? "EXPIRED" : "VALID")}");
-        Console.WriteLine($"  Scope      : {t.Scope}");
-        Console.WriteLine($"  Expires    : {t.ExpiresAt:u}");
+        Console.WriteLine($"  Scope      : {clientToken.Scope}");
+        Console.WriteLine($"  Expires    : {clientToken.ExpiresAt:u}");
     }
     else
     {
@@ -321,14 +375,14 @@ int ShowStatus()
 
     Console.WriteLine();
 
-    if (File.Exists(userTokenFile))
+    var userToken = LoadToken("user-token");
+    if (userToken != null)
     {
-        var t = JsonSerializer.Deserialize<TokenResponse>(File.ReadAllText(userTokenFile), JsonOpts)!;
-        var expired = DateTime.UtcNow > t.ExpiresAt;
+        var expired = DateTime.UtcNow > userToken.ExpiresAt;
         Console.WriteLine($"User Token   : {(expired ? "EXPIRED" : "VALID")}");
-        Console.WriteLine($"  Scope      : {t.Scope}");
-        Console.WriteLine($"  Expires    : {t.ExpiresAt:u}");
-        Console.WriteLine($"  Has Refresh: {(t.RefreshToken != null ? "yes" : "no")}");
+        Console.WriteLine($"  Scope      : {userToken.Scope}");
+        Console.WriteLine($"  Expires    : {userToken.ExpiresAt:u}");
+        Console.WriteLine($"  Has Refresh: {(userToken.RefreshToken != null ? "yes" : "no")}");
     }
     else
     {
@@ -342,6 +396,7 @@ int PrintUsage()
 {
     Console.WriteLine("Usage: auth <subcommand> [args]\n");
     Console.WriteLine("Subcommands:");
+    Console.WriteLine("  setup                      Configure Kroger API credentials (first-time)");
     Console.WriteLine("  client [scope]             Get client credentials token");
     Console.WriteLine("                             Default scope: product.compact");
     Console.WriteLine("  login [--scope <s>]        Full user OAuth2 flow — opens browser,");
@@ -352,7 +407,12 @@ int PrintUsage()
     Console.WriteLine("  exchange <code>            Exchange code for user token (manual flow)");
     Console.WriteLine("           [--verifier <v>]  Optional PKCE code verifier");
     Console.WriteLine("  refresh                    Refresh the stored user token");
-    Console.WriteLine("  status                     Show current token status\n");
+    Console.WriteLine("  status                     Show credential and token status\n");
+    Console.WriteLine("Credential sources (startup credentials only, in priority order):");
+    Console.WriteLine($"  1. Environment variables   KROGER_CLIENT_ID, KROGER_CLIENT_SECRET, KROGER_REDIRECT_URI");
+    Console.WriteLine($"  2. dotnet user secrets     ID: {UserSecretsId}");
+    Console.WriteLine($"                             Keys: Kroger:ClientId, Kroger:ClientSecret, Kroger:RedirectUri");
+    Console.WriteLine($"  3. System credential store (set via: auth setup)\n");
     Console.WriteLine("Common scopes:");
     Console.WriteLine("  product.compact            Read product data (client credentials)");
     Console.WriteLine("  cart.basic:write           Modify shopping cart (user auth)");
@@ -368,17 +428,28 @@ string? GetArg(string flag)
     return idx >= 0 && idx + 1 < args.Length ? args[idx + 1] : null;
 }
 
-async Task WriteToken(string path, TokenResponse token) =>
-    await File.WriteAllTextAsync(path, JsonSerializer.Serialize(token, JsonOpts));
+string ReadHidden(string prompt)
+{
+    Console.Write(prompt);
+    var sb = new StringBuilder();
+    while (true)
+    {
+        var key = Console.ReadKey(intercept: true);
+        if (key.Key == ConsoleKey.Enter) { Console.WriteLine(); break; }
+        if (key.Key == ConsoleKey.Backspace && sb.Length > 0) sb.Length--;
+        else if (key.Key != ConsoleKey.Backspace) sb.Append(key.KeyChar);
+    }
+    return sb.ToString();
+}
 
 // ── Models ─────────────────────────────────────────────────────────────────────
 
 class TokenResponse
 {
-    [JsonPropertyName("access_token")]  public string    AccessToken  { get; set; } = "";
-    [JsonPropertyName("token_type")]    public string    TokenType    { get; set; } = "Bearer";
-    [JsonPropertyName("expires_in")]    public int       ExpiresIn    { get; set; }
-    [JsonPropertyName("refresh_token")] public string?   RefreshToken { get; set; }
-    [JsonPropertyName("scope")]         public string?   Scope        { get; set; }
-    [JsonPropertyName("expires_at")]    public DateTime  ExpiresAt    { get; set; }
+    [JsonPropertyName("access_token")]  public string   AccessToken  { get; set; } = "";
+    [JsonPropertyName("token_type")]    public string   TokenType    { get; set; } = "Bearer";
+    [JsonPropertyName("expires_in")]    public int      ExpiresIn    { get; set; }
+    [JsonPropertyName("refresh_token")] public string?  RefreshToken { get; set; }
+    [JsonPropertyName("scope")]         public string?  Scope        { get; set; }
+    [JsonPropertyName("expires_at")]    public DateTime ExpiresAt    { get; set; }
 }

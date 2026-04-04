@@ -52,40 +52,43 @@ return 0;
 
 ## Secrets Management
 
-Never hardcode API keys, tokens, or credentials in scripts. Use `dotnet user-secrets`.
+Never hardcode API keys, tokens, or credentials in scripts. Use `Devlooped.CredentialManager`
+to store secrets in the OS credential store — encrypted at rest, cross-platform.
 
-> Docs: https://learn.microsoft.com/en-us/aspnet/core/security/app-secrets
+| Platform | Backend |
+|----------|---------|
+| Windows  | Windows Credential Manager |
+| macOS    | Keychain |
+| Linux    | Secret Service API (GNOME Keyring / KWallet) |
 
-### Setup
-
-```bash
-# Set a secret (--id ties secrets to a logical group, no .csproj needed)
-dotnet user-secrets set "ApiKey" "your-api-key-here" --id my-skill-secrets
-dotnet user-secrets set "ConnectionString" "Server=..." --id my-skill-secrets
-
-# List secrets
-dotnet user-secrets list --id my-skill-secrets
-
-# Remove a secret
-dotnet user-secrets remove "ApiKey" --id my-skill-secrets
-```
+> NuGet: https://www.nuget.org/packages/Devlooped.CredentialManager
 
 ### Access in Script
 
 ```csharp
-#:package Microsoft.Extensions.Configuration@*
-#:package Microsoft.Extensions.Configuration.UserSecrets@*
+#:package Devlooped.CredentialManager@*
 
-using Microsoft.Extensions.Configuration;
+using GitCredentialManager;
 
-var config = new ConfigurationBuilder()
-    .AddUserSecrets("my-skill-secrets")
-    .Build();
+var store = CredentialManager.Create("my-skill");
 
-var apiKey = config["ApiKey"]
+// Write
+store.AddOrUpdate("api-key", "user", "the-secret-value");
+
+// Read
+var apiKey = store.Get("api-key", "user")?.Password
     ?? throw new InvalidOperationException(
-        "ApiKey not configured. Run: dotnet user-secrets set \"ApiKey\" \"value\" --id my-skill-secrets");
+        "ApiKey not configured. Run: auth setup");
+
+// Delete
+store.Remove("api-key", "user");
 ```
+
+Convention: use the skill name as the namespace (`CredentialManager.Create("my-skill")`),
+the secret name as the service key, and a fixed account string (e.g., `"user"`) as the account.
+
+For skills that require initial setup, add a `setup` subcommand that prompts interactively
+and calls `store.AddOrUpdate(...)` — so users never have to touch the OS credential UI directly.
 
 Always include a helpful error message when a secret is missing — tell the user exactly what command to run.
 

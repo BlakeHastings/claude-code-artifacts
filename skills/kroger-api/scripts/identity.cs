@@ -1,3 +1,4 @@
+#:package Devlooped.CredentialManager@*
 #:package Microsoft.Extensions.Configuration@*
 #:package Microsoft.Extensions.Configuration.UserSecrets@*
 
@@ -6,28 +7,45 @@ using System.Text;
 using System.Text.Json;
 using System.Text.Json.Serialization;
 using System.Text.Json.Serialization.Metadata;
+using GitCredentialManager;
 using Microsoft.Extensions.Configuration;
 
-var config = new ConfigurationBuilder()
-    .AddUserSecrets("kroger-api-secrets")
+// ── Credential resolution ──────────────────────────────────────────────────────
+
+const string UserSecretsId = "a4f2e8b1-3c7d-4a9e-b5f0-1d2c3e4f5a6b";
+const string BaseUrl       = "https://api.kroger.com";
+
+var store   = CredentialManager.Create("kroger-api");
+var secrets = new ConfigurationBuilder()
+    .AddUserSecrets(UserSecretsId)
     .Build();
-
-var clientId = config["KrogerClientId"]
-    ?? throw new InvalidOperationException(
-        "KrogerClientId not configured. Run: dotnet user-secrets set \"KrogerClientId\" \"value\" --id kroger-api-secrets");
-var clientSecret = config["KrogerClientSecret"]
-    ?? throw new InvalidOperationException(
-        "KrogerClientSecret not configured. Run: dotnet user-secrets set \"KrogerClientSecret\" \"value\" --id kroger-api-secrets");
-
-const string BaseUrl = "https://api.kroger.com";
-var userTokenFile = Path.Combine(
-    Environment.GetFolderPath(Environment.SpecialFolder.UserProfile), ".kroger-api", "user-token.json");
 
 var JsonOpts = new JsonSerializerOptions
 {
     TypeInfoResolver = new DefaultJsonTypeInfoResolver(),
     WriteIndented    = true,
 };
+
+string? Resolve(string envVar, string secretKey, string storeKey) =>
+    Environment.GetEnvironmentVariable(envVar)
+    ?? secrets[secretKey]
+    ?? store.Get($"{BaseUrl}/{storeKey}", "kroger")?.Password;
+
+var clientId     = Resolve("KROGER_CLIENT_ID",     "Kroger:ClientId",     "client-id")
+    ?? throw new InvalidOperationException("Kroger credentials not configured. Run: auth setup");
+var clientSecret = Resolve("KROGER_CLIENT_SECRET", "Kroger:ClientSecret", "client-secret")
+    ?? throw new InvalidOperationException("Kroger credentials not configured. Run: auth setup");
+
+void SaveToken(string key, TokenResponse token) =>
+    store.AddOrUpdate($"{BaseUrl}/{key}", "kroger", JsonSerializer.Serialize(token, JsonOpts));
+
+TokenResponse? LoadToken(string key)
+{
+    var json = store.Get($"{BaseUrl}/{key}", "kroger")?.Password;
+    return json is null ? null : JsonSerializer.Deserialize<TokenResponse>(json, JsonOpts);
+}
+
+// ── Routing ────────────────────────────────────────────────────────────────────
 
 if (args.Length == 0) return PrintUsage();
 
@@ -70,8 +88,7 @@ int PrintUsage()
     Console.WriteLine("Subcommands:");
     Console.WriteLine("  profile              Get authenticated customer profile ID\n");
     Console.WriteLine("Note: Identity requires user authentication (scope: profile.compact).");
-    Console.WriteLine("  Run: auth url --scope profile.compact");
-    Console.WriteLine("  Then: auth exchange <code>\n");
+    Console.WriteLine("  Run: auth login --scope profile.compact\n");
     Console.WriteLine("Rate limit: 5,000 calls/day");
     return 1;
 }
@@ -80,22 +97,21 @@ int PrintUsage()
 
 async Task<string?> GetOrRefreshUserToken()
 {
-    if (!File.Exists(userTokenFile))
+    var stored = LoadToken("user-token");
+    if (stored == null)
     {
         Console.Error.WriteLine("No user token found. Identity requires user authentication.");
-        Console.Error.WriteLine("  Run: auth url --scope profile.compact");
-        Console.Error.WriteLine("  Then: auth exchange <code>");
+        Console.Error.WriteLine("  Run: auth login --scope profile.compact");
         return null;
     }
 
-    var stored = JsonSerializer.Deserialize<TokenResponse>(await File.ReadAllTextAsync(userTokenFile), JsonOpts)!;
     if (DateTime.UtcNow < stored.ExpiresAt)
         return stored.AccessToken;
 
     if (stored.RefreshToken == null)
     {
         Console.Error.WriteLine("User token expired and no refresh token available.");
-        Console.Error.WriteLine("Re-authorize: auth url --scope profile.compact");
+        Console.Error.WriteLine("Re-authorize: auth login --scope profile.compact");
         return null;
     }
 
@@ -113,17 +129,14 @@ async Task<string?> GetOrRefreshUserToken()
 
     if (!response.IsSuccessStatusCode)
     {
-        Console.Error.WriteLine("Token refresh failed. Re-authorize: auth url --scope profile.compact");
+        Console.Error.WriteLine("Token refresh failed. Re-authorize: auth login --scope profile.compact");
         return null;
     }
 
     var json  = await response.Content.ReadAsStringAsync();
     var token = JsonSerializer.Deserialize<TokenResponse>(json, JsonOpts)!;
     token.ExpiresAt = DateTime.UtcNow.AddSeconds(token.ExpiresIn - 60);
-
-    Directory.CreateDirectory(Path.GetDirectoryName(userTokenFile)!);
-    await File.WriteAllTextAsync(userTokenFile,
-        JsonSerializer.Serialize(token, JsonOpts));
+    SaveToken("user-token", token);
 
     return token.AccessToken;
 }

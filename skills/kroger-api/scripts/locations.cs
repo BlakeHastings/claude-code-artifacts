@@ -1,3 +1,4 @@
+#:package Devlooped.CredentialManager@*
 #:package Microsoft.Extensions.Configuration@*
 #:package Microsoft.Extensions.Configuration.UserSecrets@*
 
@@ -6,22 +7,18 @@ using System.Text;
 using System.Text.Json;
 using System.Text.Json.Serialization;
 using System.Text.Json.Serialization.Metadata;
+using GitCredentialManager;
 using Microsoft.Extensions.Configuration;
 
-var config = new ConfigurationBuilder()
-    .AddUserSecrets("kroger-api-secrets")
+// ── Credential resolution ──────────────────────────────────────────────────────
+
+const string UserSecretsId = "a4f2e8b1-3c7d-4a9e-b5f0-1d2c3e4f5a6b";
+const string BaseUrl       = "https://api.kroger.com";
+
+var store   = CredentialManager.Create("kroger-api");
+var secrets = new ConfigurationBuilder()
+    .AddUserSecrets(UserSecretsId)
     .Build();
-
-var clientId = config["KrogerClientId"]
-    ?? throw new InvalidOperationException(
-        "KrogerClientId not configured. Run: dotnet user-secrets set \"KrogerClientId\" \"value\" --id kroger-api-secrets");
-var clientSecret = config["KrogerClientSecret"]
-    ?? throw new InvalidOperationException(
-        "KrogerClientSecret not configured. Run: dotnet user-secrets set \"KrogerClientSecret\" \"value\" --id kroger-api-secrets");
-
-const string BaseUrl = "https://api.kroger.com";
-var clientTokenFile = Path.Combine(
-    Environment.GetFolderPath(Environment.SpecialFolder.UserProfile), ".kroger-api", "client-token.json");
 
 var JsonOpts = new JsonSerializerOptions
 {
@@ -29,17 +26,38 @@ var JsonOpts = new JsonSerializerOptions
     WriteIndented    = true,
 };
 
+string? Resolve(string envVar, string secretKey, string storeKey) =>
+    Environment.GetEnvironmentVariable(envVar)
+    ?? secrets[secretKey]
+    ?? store.Get($"{BaseUrl}/{storeKey}", "kroger")?.Password;
+
+var clientId     = Resolve("KROGER_CLIENT_ID",     "Kroger:ClientId",     "client-id")
+    ?? throw new InvalidOperationException("Kroger credentials not configured. Run: auth setup");
+var clientSecret = Resolve("KROGER_CLIENT_SECRET", "Kroger:ClientSecret", "client-secret")
+    ?? throw new InvalidOperationException("Kroger credentials not configured. Run: auth setup");
+
+void SaveToken(string key, TokenResponse token) =>
+    store.AddOrUpdate($"{BaseUrl}/{key}", "kroger", JsonSerializer.Serialize(token, JsonOpts));
+
+TokenResponse? LoadToken(string key)
+{
+    var json = store.Get($"{BaseUrl}/{key}", "kroger")?.Password;
+    return json is null ? null : JsonSerializer.Deserialize<TokenResponse>(json, JsonOpts);
+}
+
+// ── Routing ────────────────────────────────────────────────────────────────────
+
 if (args.Length == 0) return PrintUsage();
 
 return args[0].ToLower() switch
 {
-    "search"     => await SearchLocations(),
-    "get"        => await GetResource($"{BaseUrl}/v1/locations/{RequireArg(1, "locationId")}"),
-    "chains"     => await GetResource($"{BaseUrl}/v1/chains"),
-    "chain"      => await GetResource($"{BaseUrl}/v1/chains/{RequireArg(1, "chain name")}"),
-    "departments"=> await GetResource($"{BaseUrl}/v1/departments"),
-    "department" => await GetResource($"{BaseUrl}/v1/departments/{RequireArg(1, "departmentId")}"),
-    _            => PrintUsage()
+    "search"      => await SearchLocations(),
+    "get"         => await GetResource($"{BaseUrl}/v1/locations/{RequireArg(1, "locationId")}"),
+    "chains"      => await GetResource($"{BaseUrl}/v1/chains"),
+    "chain"       => await GetResource($"{BaseUrl}/v1/chains/{RequireArg(1, "chain name")}"),
+    "departments" => await GetResource($"{BaseUrl}/v1/departments"),
+    "department"  => await GetResource($"{BaseUrl}/v1/departments/{RequireArg(1, "departmentId")}"),
+    _             => PrintUsage()
 };
 
 // ── Subcommands ────────────────────────────────────────────────────────────────
@@ -75,7 +93,8 @@ async Task<int> SearchLocations()
     if (chain      != null) query.Add($"filter.chain={Uri.EscapeDataString(chain)}");
     if (department != null) query.Add($"filter.department={Uri.EscapeDataString(department)}");
 
-    return await GetResource($"{BaseUrl}/v1/locations?{string.Join("&", query)}");
+    var url = $"{BaseUrl}/v1/locations?{string.Join("&", query)}";
+    return args.Contains("--json") ? await GetResource(url) : await PrintLocations(url);
 }
 
 int PrintUsage()
@@ -91,6 +110,7 @@ int PrintUsage()
     Console.WriteLine("    --limit <n>              Max results (1–200, default: 10)");
     Console.WriteLine("    --chain <name>           Filter by chain name");
     Console.WriteLine("    --department <id>        Filter by department ID(s), comma-separated");
+    Console.WriteLine("    --json                   Output raw JSON instead of formatted list");
     Console.WriteLine("  get <locationId>           Get location details");
     Console.WriteLine("  chains                     List all retail chains");
     Console.WriteLine("  chain <name>               Get chain details by name");
@@ -102,6 +122,60 @@ int PrintUsage()
 }
 
 // ── Helpers ────────────────────────────────────────────────────────────────────
+
+async Task<int> PrintLocations(string url)
+{
+    var token = await GetOrRefreshClientToken();
+    if (token == null) return 1;
+
+    using var http = new HttpClient();
+    http.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", token);
+    http.DefaultRequestHeaders.Accept.ParseAdd("application/json");
+
+    var response = await http.GetAsync(url);
+    var body = await response.Content.ReadAsStringAsync();
+
+    if (!response.IsSuccessStatusCode)
+    {
+        Console.Error.WriteLine($"Error {(int)response.StatusCode}: {body}");
+        return 1;
+    }
+
+    using var doc = JsonDocument.Parse(body);
+    var data = doc.RootElement.GetProperty("data");
+    var count = data.GetArrayLength();
+
+    if (count == 0) { Console.WriteLine("No locations found."); return 0; }
+
+    Console.WriteLine($"Found {count} location{(count == 1 ? "" : "s")}:\n");
+
+    int i = 1;
+    foreach (var loc in data.EnumerateArray())
+    {
+        var name  = loc.TryGetProperty("name",       out var n) ? n.GetString() : "Unknown";
+        var id    = loc.TryGetProperty("locationId", out var l) ? l.GetString() : "?";
+        var chain = loc.TryGetProperty("chain",      out var c) ? c.GetString() : null;
+        var phone = loc.TryGetProperty("phone",      out var ph) ? ph.GetString() : null;
+
+        string? address = null;
+        if (loc.TryGetProperty("address", out var addr))
+        {
+            var line1 = addr.TryGetProperty("addressLine1", out var a1) ? a1.GetString() : null;
+            var city  = addr.TryGetProperty("city",         out var cy) ? cy.GetString() : null;
+            var state = addr.TryGetProperty("state",        out var st) ? st.GetString() : null;
+            var zip   = addr.TryGetProperty("zipCode",      out var zp) ? zp.GetString() : null;
+            address = string.Join(", ", new[] { line1, city, state, zip }.Where(s => !string.IsNullOrEmpty(s)));
+        }
+
+        Console.WriteLine($"{i++}. {name}{(chain != null ? $" ({chain})" : "")}");
+        Console.WriteLine($"   ID: {id}");
+        if (!string.IsNullOrEmpty(address)) Console.WriteLine($"   {address}");
+        if (!string.IsNullOrEmpty(phone))   Console.WriteLine($"   {phone}");
+        Console.WriteLine();
+    }
+
+    return 0;
+}
 
 async Task<int> GetResource(string url)
 {
@@ -131,13 +205,13 @@ async Task<int> GetResource(string url)
 
 async Task<string?> GetOrRefreshClientToken()
 {
-    if (!File.Exists(clientTokenFile))
+    var stored = LoadToken("client-token");
+    if (stored == null)
     {
         Console.Error.WriteLine("No client token found. Run: auth client product.compact");
         return null;
     }
 
-    var stored = JsonSerializer.Deserialize<TokenResponse>(await File.ReadAllTextAsync(clientTokenFile), JsonOpts)!;
     if (DateTime.UtcNow < stored.ExpiresAt)
         return stored.AccessToken;
 
@@ -162,10 +236,7 @@ async Task<string?> GetOrRefreshClientToken()
     var json  = await response.Content.ReadAsStringAsync();
     var token = JsonSerializer.Deserialize<TokenResponse>(json, JsonOpts)!;
     token.ExpiresAt = DateTime.UtcNow.AddSeconds(token.ExpiresIn - 60);
-
-    Directory.CreateDirectory(Path.GetDirectoryName(clientTokenFile)!);
-    await File.WriteAllTextAsync(clientTokenFile,
-        JsonSerializer.Serialize(token, JsonOpts));
+    SaveToken("client-token", token);
 
     return token.AccessToken;
 }

@@ -16,7 +16,7 @@
 
 6. **Deterministic behavior via scripts.** When a skill needs programmatic logic — API calls, data transformations, validation, file processing — use .NET single-file scripts (`scripts/*.cs`) instead of relying on Claude to perform the logic ad-hoc. This makes operations reproducible and testable. See `references/dotnet-scripts.md`.
 
-7. **Never hardcode secrets.** API keys, tokens, and credentials must use `dotnet user-secrets` for development. Never put secrets in SKILL.md, reference files, or scripts. See `references/dotnet-scripts.md` for implementation details.
+7. **Never hardcode secrets.** API keys, tokens, and credentials must never be stored in plaintext. Use `Devlooped.CredentialManager` (NuGet) to store all secrets in the OS credential store (Windows Credential Manager / macOS Keychain / Linux Secret Service). Never put secrets in SKILL.md, reference files, scripts, or `dotnet user-secrets`. See `references/dotnet-scripts.md` for implementation details.
 
 ## Common Patterns
 
@@ -36,7 +36,7 @@
 - **Vague descriptions** — "A helpful skill" tells Claude nothing. Be specific about triggers.
 - **Overly broad tool access** — Omitting `allowed-tools` grants everything. Be explicit.
 - **`context: fork` on interactive skills** — Fork loses conversation history. Only use for stateless/research tasks.
-- **Hardcoded secrets** — API keys in files. Always use `dotnet user-secrets`.
+- **Hardcoded secrets** — API keys in files. Always use `Devlooped.CredentialManager`.
 - **Ad-hoc logic that should be scripted** — If Claude is performing the same multi-step data transformation every time, put it in a script.
 
 ## When to Split Into Multiple Files

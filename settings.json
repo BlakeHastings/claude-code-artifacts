@@ -1,0 +1,38 @@
+{
+  "permissions": {
+    "allow": [
+      "WebFetch(domain:developer.kroger.com)",
+      "WebSearch",
+      "WebFetch(domain:www.postman.com)",
+      "WebFetch(domain:github.com)",
+      "WebFetch(domain:publicapi.dev)",
+      "WebFetch(domain:raw.githubusercontent.com)",
+      "WebFetch(domain:developer-ce.kroger.com)",
+      "Skill(manage-skills)",
+      "Skill(kroger-api)",
+      "Bash(dotnet:*)",
+      "WebFetch"
+    ],
+    "defaultMode": "default"
+  },
+  "skipDangerousModePermissionPrompt": true,
+  "autoAddCoAuthor": false,
+  "allowedTools": [
+    "Read",
+    "Glob",
+    "Grep",
+    "WebFetch",
+    "WebSearch",
+    "ListMcpResourcesTool",
+    "ReadMcpResourceTool",
+    "TaskCreate",
+    "TaskGet",
+    "TaskList",
+    "TaskUpdate",
+    "TaskOutput",
+    "TaskStop",
+    "AskUserQuestion",
+    "ExitPlanMode"
+  ],
+  "model": "sonnet"
+}
