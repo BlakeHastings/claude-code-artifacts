@@ -50,6 +50,7 @@ Parse `$ARGUMENTS`. The first token selects the operation:
 | `vm start <vmid>` | `uv run ... vm start <vmid>` | Start a VM |
 | `vm stop <vmid>` | `uv run ... vm stop <vmid>` | Immediate stop |
 | `vm shutdown <vmid>` | `uv run ... vm shutdown <vmid>` | ACPI graceful shutdown |
+| `vm delete <vmid>` | `uv run ... vm delete <vmid>` | Delete a VM (stop first if running) |
 | `nextid` | `uv run ... nextid` | Next available VMID |
 | `storage` | `uv run ... storage` | List storage pools |
 | `resources` | `uv run ... resources` | All cluster resources |
@@ -80,7 +81,8 @@ uv run .claude/skills/proxmox-api/scripts/proxmox.py resources --json
 - **List operations** (`nodes`, `vms`, `storage`, `resources`): Summarize key facts. Call out anomalies — stopped VMs that may need attention, storage pools near capacity, nodes in unknown state.
 - **`vm status <vmid>`**: Describe the VM's name, state, CPU, memory, and uptime in a natural sentence.
 - **`nextid`**: State the VMID and confirm it is safe to use when creating a new VM in Terraform.
-- **Mutating operations** (`vm start`, `vm stop`, `vm shutdown`): Report success or failure clearly. On non-zero exit, explain the error.
+- **Mutating operations** (`vm start`, `vm stop`, `vm shutdown`, `vm delete`): Report success or failure clearly. On non-zero exit, explain the error.
+- **`vm delete <vmid>`**: Confirm the task ID returned by Proxmox. The deletion is async — the VM disappears within a few seconds.
 
 ## Exit Codes
 

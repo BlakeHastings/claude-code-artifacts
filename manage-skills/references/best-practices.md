@@ -14,7 +14,27 @@
 
 5. **Minimal `allowed-tools`.** Only grant tools the skill actually uses. This communicates intent and limits blast radius.
 
-6. **Deterministic behavior via scripts.** When a skill needs programmatic logic — API calls, data transformations, validation, file processing — use .NET single-file scripts (`scripts/*.cs`) instead of relying on Claude to perform the logic ad-hoc. This makes operations reproducible and testable. See `references/dotnet-scripts.md`.
+6. **Deterministic behavior via scripts.** When a skill needs programmatic logic — API calls, data transformations, validation, file processing — use scripts instead of relying on Claude to perform the logic ad-hoc. This makes operations reproducible and testable.
+   - **Python scripts with `uv`:** Use `uv run scripts/action.py` with inline dependency metadata (`# /// script` block). Use **[Click](https://click.palletsprojects.com/)** for CLI argument parsing — not `argparse` or manual `sys.argv` parsing. Add `click` to the script's `dependencies` list. See `references/dotnet-scripts.md` for .NET alternatives.
+   - **Example script header:**
+     ```python
+     # /// script
+     # requires-python = ">=3.9"
+     # dependencies = ["click", "requests"]
+     # ///
+     import click
+
+     @click.command()
+     @click.argument("target")
+     @click.option("--json", "as_json", is_flag=True)
+     def main(target, as_json):
+         ...
+
+     if __name__ == "__main__":
+         main()
+     ```
+   - **Error handling:** Raise `click.ClickException("message")` for user-facing errors — Click formats and exits cleanly. Use `click.echo(..., err=True)` for stderr output.
+   - **Secrets:** See `references/dotnet-scripts.md` for credential storage patterns (keyring for Python, `Devlooped.CredentialManager` for .NET).
 
 7. **Never hardcode secrets.** API keys, tokens, and credentials must never be stored in plaintext. Use `Devlooped.CredentialManager` (NuGet) to store all secrets in the OS credential store (Windows Credential Manager / macOS Keychain / Linux Secret Service). Never put secrets in SKILL.md, reference files, scripts, or `dotnet user-secrets`. See `references/dotnet-scripts.md` for implementation details.
 
