@@ -2,6 +2,9 @@
 #:package Microsoft.Extensions.Configuration@*
 #:package Microsoft.Extensions.Configuration.UserSecrets@*
 
+// Suppress IL2026 and IL3050 warnings
+#pragma warning disable IL2026,IL3050
+
 using System.Net.Http.Headers;
 using System.Text;
 using System.Text.Json;

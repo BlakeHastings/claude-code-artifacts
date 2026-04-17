@@ -6,6 +6,18 @@
 
 `.cs` files that run directly with `dotnet run file.cs` — no project file needed. Available in .NET 10+. They're cross-platform, can reference NuGet packages, and are ideal for deterministic skill operations.
 
+> **IL2026/IL3050 Warning Fix**: For scripts using JSON serialization (System.Text.Json), add `#pragma warning disable IL2026,IL3050` after the `#:package` directives to suppress AOT/trimming analysis warnings that clutter output:
+> ```csharp
+> #:package Devlooped.CredentialManager@*
+> #pragma warning disable IL2026,IL3050  // Suppress JSON serialization trimming warnings
+> 
+> using System.Text.Json;
+> ```
+
+## Syntax Quick Reference
+
+`.cs` files that run directly with `dotnet run file.cs` — no project file needed. Available in .NET 10+. They're cross-platform, can reference NuGet packages, and are ideal for deterministic skill operations.
+
 ## Syntax Quick Reference
 
 ```csharp
