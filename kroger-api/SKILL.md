@@ -44,8 +44,10 @@ This interactive command stores all credentials in the OS credential store
 
 ## Operations
 
+All commands work in both bash and PowerShell shells (OpenCode's Bash tool uses pwsh.exe on Windows). Call them directly - no need for `cd` or special shell syntax. The working directory is automatically set to the skill root when invoked through OpenCode.
+
 ### Auth
-```
+```bash
 dotnet run scripts/auth.cs -- $2 $3 $4 $5 $6 $7
 ```
 Subcommands: `setup`, `client [scope]`, `login`, `url [--scope <s>]`, `exchange <code>`, `refresh`, `status`
