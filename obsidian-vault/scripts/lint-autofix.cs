@@ -23,7 +23,7 @@ using System.IO;
 using System.Linq;
 using System.Text.RegularExpressions;
 
-const string VaultPath = @"C:\Users\Blake\Documents\main";
+const string VaultPath = @"C:\Users\Blake\Documents\Obsidian\main";
 const string SkillPath = @"C:\Users\Blake\.claude\skills\obsidian-vault";
 
 if (args.Length == 0)

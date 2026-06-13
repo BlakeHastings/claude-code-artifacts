@@ -16,7 +16,7 @@ using System.Linq;
 using System.Text;
 using System.Text.RegularExpressions;
 
-const string VaultPath = @"C:\Users\Blake\Documents\main";
+const string VaultPath = @"C:\Users\Blake\Documents\Obsidian\main";
 const string SkillPath = @"C:\Users\Blake\.claude\skills\obsidian-vault";
 
 string target = args.Length > 0 ? args[0] : "";

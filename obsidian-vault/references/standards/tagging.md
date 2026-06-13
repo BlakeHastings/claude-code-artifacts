@@ -1,6 +1,6 @@
 ---
 standards-component: tagging
-component-version: "1.0.0"
+component-version: "1.2.0"
 part-of-standards: "1.0.0"
 ---
 
@@ -23,9 +23,11 @@ Every note has **one primary tag** identifying its type.
 | `project/idea` | Project idea (not started) |
 | `feature` | Feature note for a project |
 | `project/feature` | Feature note specifically within a project |
+| `repository` | Code repository note — pointer to a Git/GitHub repo |
 | `reference/{category}` | Reference / "truth note" (see below) |
 | `person` | Person / bio note |
 | `recipe` | Recipe note |
+| `how-to` | How-to / process note |
 
 ## Reference Sub-Tags
 

@@ -8,7 +8,7 @@ using System;
 using System.IO;
 using System.Linq;
 
-const string VaultPath = @"C:\Users\Blake\Documents\main";
+const string VaultPath = @"C:\Users\Blake\Documents\Obsidian\main";
 string templatesDir = Path.Combine(VaultPath, "Templates");
 
 if (!Directory.Exists(templatesDir))

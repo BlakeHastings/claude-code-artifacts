@@ -59,6 +59,26 @@ Claude Code sends model IDs like `claude-sonnet-4-6`, `claude-opus-4-6`, `claude
 
 The virtual key authenticates to the LiteLLM gateway; the OAuth token authenticates to Anthropic.
 
+## Health Endpoints
+
+LiteLLM exposes two health endpoints with very different behavior:
+
+| Endpoint | Behavior | Response Time |
+|---|---|---|
+| `GET /health` | Probes **all configured backends** (makes real API calls). Slow if you have many models or cloud relays. | Seconds to minutes |
+| `GET /health/liveliness` | Checks the **server process is alive**. No backend calls. | < 1 s |
+
+**Use `/health/liveliness` in deploy gates and readiness checks.** `/health` is for debugging connectivity, not for startup polling.
+
+Example deploy gate that won't timeout:
+```bash
+for i in $(seq 1 24); do
+  curl -sf http://localhost:4000/health/liveliness && echo "healthy" && exit 0
+  sleep 5
+done
+exit 1
+```
+
 ## Callbacks
 
 ```yaml

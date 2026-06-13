@@ -98,3 +98,45 @@ uv run .claude/skills/proxmox-api/scripts/proxmox.py resources --json
 ## Reference Files
 
 - `references/setup.md` — How to create a Proxmox API token and configure credentials
+
+---
+
+## API token permissions — the privsep model (very easy to get wrong)
+
+Proxmox API tokens have a `privsep` flag (set at token creation):
+
+| `privsep` | Effective permissions = | What grants matter |
+|---|---|---|
+| `1` (default) | (user's perms) ∩ (token's perms) | **BOTH** the user and the token need the ACL grant |
+| `0` | the user's perms (token grants are **ignored**) | **Only the user's** ACL grant matters |
+
+So if you see `403 Forbidden: Permission check failed (/, Sys.Audit)` from a
+read-only API endpoint despite having "granted PVEAuditor to the token":
+
+- If `privsep=0`: the token grant is ignored — you must grant on the **user**
+  ```bash
+  pveum acl modify / --users <user>@<realm> --roles PVEAuditor
+  pveum user permissions <user>@<realm> --path /   # verify
+  ```
+- If `privsep=1`: grant on **both** sides
+  ```bash
+  pveum acl modify / --users  <user>@<realm>             --roles PVEAuditor
+  pveum acl modify / --tokens <user>@<realm>!<tokenid>   --roles PVEAuditor
+  ```
+
+Check `privsep`:
+```bash
+pveum user token list <user>@<realm>
+```
+
+The 403 error is identical in both cases, so people often "fix" it by adding
+more token grants when the real fix is to add a user grant (privsep=0) or
+add the matching user grant (privsep=1). See
+[[feedback-proxmox-token-privsep]] for the durable habit.
+
+When pve-exporter (or any caller) reports `500 Internal Server Error`, dump
+its logs — the wrapped exception underneath is the actual Proxmox 4xx
+that names the missing perm and the path:
+```
+proxmoxer.core.ResourceException: 403 Forbidden: Permission check failed (/, Sys.Audit)
+```

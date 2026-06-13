@@ -1,10 +1,10 @@
 ---
-standards-version: "1.0.0"
+standards-version: "1.2.0"
 ---
 
 # Obsidian Vault Standards
 
-**Current aggregate version:** 1.0.0
+**Current aggregate version:** 1.2.0
 
 Standards for how notes in Blake's vault are structured. Each component is versioned independently; the aggregate version above bumps when any component bumps.
 
@@ -14,15 +14,16 @@ Standards for how notes in Blake's vault are structured. Each component is versi
 |-----------|------|-----------------|
 | Frontmatter schema | [frontmatter.md](frontmatter.md) | 1.0.0 |
 | Body format | [body-format.md](body-format.md) | 1.0.0 |
-| Tagging | [tagging.md](tagging.md) | 1.0.0 |
+| Tagging | [tagging.md](tagging.md) | 1.2.0 |
 | Naming | [naming.md](naming.md) | 1.0.0 |
+| Voice | [voice.md](voice.md) | 1.0.0 |
 | Versioning rules | [versioning.md](versioning.md) | 1.0.0 |
 
 ## How To Use These
 
-When **creating** or **linting** a note, read all five component files. They are short and independent.
+When **creating** or **linting** a note, read all six component files. They are short and independent.
 
-The aggregate standards version (1.0.0) is what goes in the note's `standard-version` frontmatter field.
+The aggregate standards version (1.2.0) is what goes in the note's `standard-version` frontmatter field.
 
 ## How This Version Bumps
 

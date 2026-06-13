@@ -259,14 +259,15 @@ async Task<int> HandleMail()
     if (args.Length < 2) return PrintMailUsage();
     return args[1].ToLower() switch
     {
-        "list"        => await MailList(),
-        "read"        => await MailRead(),
-        "send"        => await MailSend(),
-        "reply"       => await MailReply(false),
-        "reply-all"   => await MailReply(true),
-        "forward"     => await MailForward(),
-        "delete"      => await MailDelete(),
-        "move"        => await MailMove(),
+        "list"           => await MailList(),
+        "read"           => await MailRead(),
+        "send"           => await MailSend(),
+        "reply"          => await MailReply(false),
+        "reply-all"      => await MailReply(true),
+        "forward"        => await MailForward(),
+        "delete"         => await MailDelete(),
+        "bulk-delete"    => await MailBulkDelete(),
+        "move"           => await MailMove(),
         "search"      => await MailSearch(),
         "flag"        => await MailSetFlag(true),
         "unflag"      => await MailSetFlag(false),
@@ -483,6 +484,81 @@ async Task<int> MailDelete()
     var resp = await http.DeleteAsync($"{GraphBase}/me/messages/{Uri.EscapeDataString(args[2])}");
     if (resp.IsSuccessStatusCode) { Console.WriteLine("Deleted."); return 0; }
     return GraphError("delete", resp.StatusCode, await resp.Content.ReadAsStringAsync());
+}
+
+async Task<int> MailBulkDelete()
+{
+    var idsArg = GetArg("--ids");
+    if (idsArg == null || string.IsNullOrWhiteSpace(idsArg))
+    {
+        Console.Error.WriteLine("Usage: mail bulk-delete --ids <comma-separated list of message IDs> [--folder <name>]");
+        Console.WriteLine("\nExample: mail bulk-delete --ids id1,id2,id3,id4,id5");
+        return 1;
+    }
+
+    var folder = GetArg("--folder") ?? "inbox";
+    var ids = new List<string>(idsArg.Split(',', StringSplitOptions.TrimEntries | StringSplitOptions.RemoveEmptyEntries));
+    
+    if (ids.Count == 0)
+    {
+        Console.Error.WriteLine("No valid message IDs provided.");
+        return 1;
+    }
+
+    Console.WriteLine($"Deleting {ids.Count} emails from '{folder}'...");
+    var successCount = 0;
+    var failedCount = 0;
+    var failedIds = new List<string>();
+
+    // Process deletions sequentially to avoid API throttling (Outlook has MailboxConcurrency limits)
+    for (int i = 0; i < ids.Count; i++)
+    {
+        var id = ids[i];
+        
+        try
+        {
+            // Add small delay between requests to stay within rate limits
+            if (i > 0 && i % 5 == 0) await Task.Delay(100); // Delay every 5th request
+            
+            var resp = await http.DeleteAsync($"{GraphBase}/me/messages/{Uri.EscapeDataString(id)}");
+            
+            if (resp.IsSuccessStatusCode || resp.StatusCode == System.Net.HttpStatusCode.NoContent)
+            {
+                successCount++;
+            }
+            else if ((int)resp.StatusCode == 429) // Throttled - skip to avoid blocking
+            {
+                Console.WriteLine($"  Rate limited at ID {id} - skipping remaining...");
+                break;
+            }
+            else
+            {
+                var errorBody = await resp.Content.ReadAsStringAsync();
+                Console.Error.WriteLine($"  Failed to delete ID {id}: {(int)resp.StatusCode} - {errorBody[..Math.Min(100, errorBody.Length)]}");
+                failedCount++;
+                failedIds.Add(id);
+            }
+        }
+        catch (Exception ex)
+        {
+            Console.Error.WriteLine($"  Error deleting ID {id}: {ex.Message}");
+            failedCount++;
+            failedIds.Add(id);
+        }
+    }
+
+    Console.WriteLine($"\nCompleted: {successCount} deleted, {failedCount} failed");
+    
+    if (failedIds.Count > 0)
+    {
+        Console.Error.WriteLine("\nFailed IDs:");
+        foreach (var id in failedIds)
+        {
+            Console.WriteLine($"  - {id}");
+        }
+    }
+
+    return failedIds.Count == 0 ? 0 : 1;
 }
 
 async Task<int> MailMove()
@@ -726,16 +802,17 @@ async Task<int> AttachmentGet()
 int PrintMailUsage()
 {
     Console.WriteLine("Usage: mail <subcommand> [options]\n");
-    Console.WriteLine("  list          [--folder <name>] [--top <n>] [--unread] [--from <a>] [--subject <s>]");
-    Console.WriteLine("  read          <id> [--full-body]");
-    Console.WriteLine("  send          --to <a> --subject <s> --body <t> [--cc <a>] [--bcc <a>] [--html] [--body-file <p>]");
-    Console.WriteLine("  reply         <id> --body <t> [--html] [--body-file <p>]");
-    Console.WriteLine("  reply-all     <id> --body <t>");
-    Console.WriteLine("  forward       <id> --to <a> [--body <t>]");
-    Console.WriteLine("  delete        <id>");
-    Console.WriteLine("  move          <id> --to <folder>");
-    Console.WriteLine("  search        <query> [--top <n>]");
-    Console.WriteLine("  flag/unflag   <id>");
+    Console.WriteLine("  list             [--folder <name>] [--top <n>] [--unread] [--from <a>] [--subject <s>]");
+    Console.WriteLine("  read             <id> [--full-body]");
+    Console.WriteLine("  send             --to <a> --subject <s> --body <t> [--cc <a>] [--bcc <a>] [--html] [--body-file <p>]");
+    Console.WriteLine("  reply            <id> --body <t> [--html] [--body-file <p>]");
+    Console.WriteLine("  reply-all        <id> --body <t>");
+    Console.WriteLine("  forward          <id> --to <a> [--body <t>]");
+    Console.WriteLine("  delete           <id>");
+    Console.WriteLine("  bulk-delete      --ids <comma-separated list of message IDs> [--folder <name>]");
+    Console.WriteLine("  move             <id> --to <folder>");
+    Console.WriteLine("  search           <query> [--top <n>]");
+    Console.WriteLine("  flag/unflag      <id>");
     Console.WriteLine("  mark-read/mark-unread  <id>");
     Console.WriteLine("  draft list|create|update|send");
     Console.WriteLine("  attachment list|get");

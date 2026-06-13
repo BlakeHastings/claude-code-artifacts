@@ -1,6 +1,6 @@
 # Vault Layout
 
-**Vault path:** `C:\Users\Blake\Documents\main`
+**Vault path:** `C:\Users\Blake\Documents\Obsidian\main`
 
 This path is hardcoded for skill v1.0.0. Iterate later if the vault moves or a second vault is added.
 

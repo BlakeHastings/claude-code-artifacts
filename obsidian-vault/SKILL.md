@@ -4,17 +4,17 @@ description: >-
   Create, lint, and search notes in Blake's Obsidian vault (second brain,
   knowledge base). Use when the user wants to create an atomic note, daily
   note, index note, project note, feature note, reference note, person note,
-  recipe note, or any other Obsidian note; lint existing notes against vault
+  recipe note, repository note, or any other Obsidian note; lint existing notes against vault
   standards; search the vault; or propagate template/standards version updates.
-  Operates on the vault at C:\Users\Blake\Documents\main.
+  Operates on the vault at C:\Users\Blake\Documents\Obsidian\main.
 allowed-tools: Read, Write, Edit, Glob, Grep, Bash
 ---
 # Obsidian Vault
 
-Skill for managing Blake's Obsidian vault at `C:\Users\Blake\Documents\main`.
+Skill for managing Blake's Obsidian vault at `C:\Users\Blake\Documents\Obsidian\main`.
 
-- **Skill version:** 1.1.0 — see [CHANGELOG.md](CHANGELOG.md)
-- **Vault standards version:** 1.0.0 — see [references/standards/README.md](references/standards/README.md)
+- **Skill version:** 1.3.1 — see [CHANGELOG.md](CHANGELOG.md)
+- **Vault standards version:** 1.2.0 — see [references/standards/README.md](references/standards/README.md)
 
 ## Argument Parsing
 
@@ -40,7 +40,7 @@ Vault layout and paths are in `references/vault-layout.md`. Read that first befo
 
 Do not inline standards or templates into this file. They live elsewhere:
 - **Standards** → `references/standards/` (within the skill)
-- **Templates** → `C:\Users\Blake\Documents\main\Templates\` (within the vault — never duplicated here)
+- **Templates** → `C:\Users\Blake\Documents\Obsidian\main\Templates\` (within the vault — never duplicated here)
 
 ## Scripts
 
