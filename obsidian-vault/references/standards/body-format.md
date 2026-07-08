@@ -1,6 +1,6 @@
 ---
 standards-component: body-format
-component-version: "1.0.0"
+component-version: "1.1.0"
 part-of-standards: "1.0.0"
 ---
 
@@ -19,6 +19,12 @@ How the body of a note (everything after the frontmatter) is structured.
 5. **Horizontal rule `---`** before any trailing References section.
 6. **Optional References section** at the bottom — only when a link has no natural home in the body prose. Ideally every link lives inline.
 7. **Book / source references** may include an APA-style citation as the final line of the note.
+
+## Value Formatting
+
+How recurring data values are written, so the same value always renders identically (and collides cleanly when captured as a value-titled note).
+
+1. **Phone numbers** use the **hyphenated** form with **no parentheses and no spaces**: `615-703-6651`, not `(615) 703-6651` or `615.703.6651`. This holds everywhere a number appears: note titles, aliases, body prose, and frontmatter. A standard format means the same number is always one string, so a phone note titled by its value is a reliable collision point across entities.
 
 ## Example
 

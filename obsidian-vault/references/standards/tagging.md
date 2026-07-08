@@ -1,6 +1,6 @@
 ---
 standards-component: tagging
-component-version: "1.2.0"
+component-version: "1.5.0"
 part-of-standards: "1.0.0"
 ---
 
@@ -28,6 +28,13 @@ Every note has **one primary tag** identifying its type.
 | `person` | Person / bio note |
 | `recipe` | Recipe note |
 | `how-to` | How-to / process note |
+| `investigation` | OSINT investigation hub for a subject (see the `osint-investigation` skill) |
+| `report` | A reader-facing report that distills an investigation (or other body of notes) into plain-language findings for a specific audience and decision |
+| `status-update` | Atomic status / event-log entry (a call, email, observation) tied to a project |
+| `organization` | A company, legal entity, or brand |
+| `location` | A place or address; often value-titled by the literal address |
+| `post` | A specific social-media post |
+| `link` | A link / identity note: the evidence and verdict on a connection or identity question between entities. Distinct from the linking *standard* (which is the wikilink / Dataview mechanics) |
 
 ## Reference Sub-Tags
 
@@ -54,6 +61,25 @@ Sub-tags classify by **content category, NOT medium**:
 ## Secondary Tags
 
 Secondary tags are **topic tags**: `rome`, `physics`, `writing`, etc. A note may have as many as are meaningful. Hierarchy is allowed (`physics/quantum`).
+
+## Status Tags
+
+Some notes move through a **lifecycle**. Status is expressed as a **hierarchical tag under a status namespace, never a frontmatter `Status:` field** (that field was retired). Namespacing groups every state under one parent in the tag pane, so you can filter the whole lifecycle (`reading/`) or a single state (`reading/active`). Exactly **one** status from a namespace applies at a time; you swap the tag as the note advances. The primary tag (e.g. `reference/book`) never changes.
+
+### Reading status (`reading/`)
+
+For anything you intend to read (usually `reference/book`). One state at a time:
+
+| Tag | State |
+|-----|-------|
+| `reading/backlog` | Captured, want to read, not yet queued (the someday pile) |
+| `reading/queued` | Queued to read next |
+| `reading/active` | Currently reading |
+| `reading/done` | Finished |
+
+The `Index/Reading List` MOC sections books by these states. `reading/done` is a **kept record, not a removal**, so completed reading stays tracked rather than falling off the list.
+
+Precedent: this mirrors project lifecycle states (`project/active`, `project/paused`, `project/archived`, `project/idea`), except a reading status sits **alongside** the primary tag rather than being the primary tag. Status tags follow the same lowercase, hyphen-separated rule as every other tag.
 
 ## Rules
 

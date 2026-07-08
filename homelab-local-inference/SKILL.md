@@ -528,3 +528,17 @@ inference hosts (`blake` is NOT NOPASSWD on either box).
   renumbered/replaced with `ubuntu-tower-02.lan` (currently 192.168.0.217
   via DHCP). All current code uses `.lan` hostnames + dns-vm lookup;
   if you find stale `.211` references in docs, they're cleanup follow-ups.
+- **Orphaned gateway containers on inference-01 (found June 2026):** when
+  LiteLLM + Open WebUI lived on the inference machine (pre-May-2026), they
+  ran as Docker containers there. The May-2026 refactor stopped *declaring*
+  them in `inference-setup.yml`, but `docker_container` is additive: it
+  never reaped the running containers (see `[[homelab-bootstrap]]`
+  "docker_container Is Additive"). So `inference-01` (ubuntu-tower) was
+  found still running `open-webui`, `litellm`, AND `litellm-postgres`
+  weeks later, untouched by every `provision-inference` re-run since.
+  Removed by hand: `ssh blake@ubuntu-tower.lan "docker rm -f open-webui
+  litellm litellm-postgres"` (postgres is a separate task, easy to miss).
+  Re-running provisioning does NOT clean these — only a manual `docker rm`
+  or an explicit `state: absent` task does. Expected survivors on a clean
+  inference box: `llama-server-<model>`, `alloy`, `node-exporter`,
+  `dcgm-exporter` (all containers) + LM Studio (native process, :1234).

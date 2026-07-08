@@ -5,7 +5,9 @@ description: >-
   knowledge base). Use when the user wants to create an atomic note, daily
   note, index note, project note, feature note, reference note, person note,
   recipe note, repository note, or any other Obsidian note; lint existing notes against vault
-  standards; search the vault; or propagate template/standards version updates.
+  standards; search the vault; explore a note's related notes (backlinks/incoming links,
+  outgoing links, neighbors); rename, move, or delete notes (via the official Obsidian CLI,
+  so backlinks stay intact); or propagate template/standards version updates.
   Operates on the vault at C:\Users\Blake\Documents\Obsidian\main.
 allowed-tools: Read, Write, Edit, Glob, Grep, Bash
 ---
@@ -13,8 +15,8 @@ allowed-tools: Read, Write, Edit, Glob, Grep, Bash
 
 Skill for managing Blake's Obsidian vault at `C:\Users\Blake\Documents\Obsidian\main`.
 
-- **Skill version:** 1.3.1 — see [CHANGELOG.md](CHANGELOG.md)
-- **Vault standards version:** 1.2.0 — see [references/standards/README.md](references/standards/README.md)
+- **Skill version:** 1.13.0 — see [CHANGELOG.md](CHANGELOG.md)
+- **Vault standards version:** 1.10.0 — see [references/standards/README.md](references/standards/README.md)
 
 ## Argument Parsing
 
@@ -24,6 +26,7 @@ Parse `$ARGUMENTS`. First token is the operation:
 |-----------|---------|-----------|
 | `create` | `new`, `add` | `references/operations/create-note.md` |
 | `lint` | `check`, `normalize` | `references/operations/lint-note.md` |
+| `related` | `links`, `backlinks`, `neighbors`, `connections` | `references/operations/related-notes.md` |
 | `search` | `find`, `query` | `references/operations/search-vault.md` (STUB) |
 
 If no operation is given, ask the user what they want to do.
@@ -31,6 +34,12 @@ If no operation is given, ask the user what they want to do.
 ## Vault Location
 
 Vault layout and paths are in `references/vault-layout.md`. Read that first before touching the vault.
+
+## Renames, Moves, Deletes, and Link Analysis
+
+**Never rename or move a note by raw filesystem operations** (writing a new file and deleting the old one). That orphans every backlink. Use the official Obsidian CLI, which rewrites backlinks vault-wide. The full policy, prerequisites, exact commands, and the manual fallback when the CLI is unavailable are in [`references/obsidian-cli.md`](references/obsidian-cli.md). Read it before any rename, move, delete, or backlink check.
+
+To **explore a note's relationships** (backlinks, outgoing links, second-degree neighbors, shared-tag relatives) rather than mutate them, use the `related` operation — see [`references/operations/related-notes.md`](references/operations/related-notes.md). It reads Obsidian's resolved link graph via the CLI; it never modifies the vault.
 
 ## Operation Dispatch
 

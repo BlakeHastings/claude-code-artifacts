@@ -28,7 +28,7 @@ Authoritative source: Microsoft C# reference, [Recommended XML documentation tag
 
 6. **Don't restate the signature or document the obvious.** A summary of "Gets or sets the name." on a `Name` property adds nothing. Document the non-obvious: units, nullability meaning, invariants, side effects, ordering guarantees.
 
-7. **Use `<inheritdoc/>` instead of copy-pasting, and inherit in the right direction.** The base owns the canonical docs; the derived member inherits. The *interface* (or base type) carries the real `<summary>`/`<param>`/`<returns>`; the *implementation*, override, or sync/async twin gets a bare `<inheritdoc/>`. A bare `<inheritdoc/>` on an implementation auto-resolves to the interface member it implements, so no `cref` is needed. Putting the prose on the implementation and pointing the interface at it with `<inheritdoc cref="TheImplementation"/>` is backwards: the contract should document itself, and if the implementation is undocumented the interface inherits nothing. Reserve `<inheritdoc cref="..."/>` for links the compiler can't infer, such as a sync/async twin.
+7. **Use `<inheritdoc/>` instead of copy-pasting, and inherit in the right direction.** The base owns the canonical docs; the derived member inherits. The *interface* (or base type) carries the real `<summary>`/`<param>`/`<returns>`; the *implementation*, override, or sync/async twin gets a bare `<inheritdoc/>`. A bare `<inheritdoc/>` on an implementation auto-resolves to the interface member it implements, so no `cref` is needed. Putting the prose on the implementation and pointing the interface at it with `<inheritdoc cref="TheImplementation"/>` is backwards: the contract should document itself, and if the implementation is undocumented the interface inherits nothing. Reserve `<inheritdoc cref="..."/>` for links the compiler can't infer, such as a sync/async twin. Note the asymmetry: Visual Studio auto-inherits docs into IntelliSense even without the tag, but the **compiler-generated XML file does not** — so for any library you distribute, write `<inheritdoc/>` explicitly or consumers get empty docs.
 
 8. **Generic and exception tags when they apply.** `<typeparam name="T">` for each type parameter; `<exception cref="...">` for exceptions a caller can reasonably expect and handle.
 
@@ -42,10 +42,12 @@ Authoritative source: Microsoft C# reference, [Recommended XML documentation tag
 | `<returns>` | What the return value represents. |
 | `<value>` | What a property's value represents. |
 | `<typeparam name="T">` | What a generic type parameter is for. |
+| `<typeparamref name="T"/>` | Refers to a generic type parameter inside prose (generic analog of `<paramref>`). |
 | `<exception cref="E">` | An exception the member can throw. |
 | `<see cref="M"/>` | Inline link to another code element. |
 | `<paramref name="x"/>` | Refers to a parameter inside prose. |
 | `<c>` / `<code>` | Inline / multi-line code formatting. |
+| `<example>` | A usage example, usually wrapping a `<code>` block. |
 | `<inheritdoc/>` | Inherit comments from base/interface/sync-twin. |
 
 ## Examples

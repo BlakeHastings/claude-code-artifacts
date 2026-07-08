@@ -331,6 +331,76 @@ def scope(name: str, as_json: bool) -> None:
     _emit(data["response"], as_json)
 
 
+@cli.command("scope-set")
+@click.argument("name")
+@click.option("--start", "starting_address", required=True, help="Pool start IP.")
+@click.option("--end", "ending_address", required=True, help="Pool end IP.")
+@click.option("--mask", "subnet_mask", default="255.255.255.0", help="Subnet mask.")
+@click.option("--router", "router_address", required=True, help="Gateway/router IP handed to clients.")
+@click.option("--dns", "dns_servers", default=None,
+              help="Comma-separated DNS servers handed to clients. Sets useThisDnsServer=false.")
+@click.option("--domain", "domain_name", default=None, help="DHCP domain; auto-registers leases as <host>.<domain>.")
+@click.option("--dns-updates/--no-dns-updates", "dns_updates", default=True,
+              help="Auto-create/update forward+reverse DNS records for leases (default on).")
+@click.option("--dns-ttl", "dns_ttl", default=900, type=int)
+@click.option("--lease-days", "lease_days", default=1, type=int)
+@click.option("--ping-check/--no-ping-check", "ping_check", default=True,
+              help="Ping an address before offering it, to avoid handing out an in-use IP (default on).")
+@click.option("--exclusions", "exclusions", default=None,
+              help="Raw exclusions string passed verbatim as the 'exclusions' API param (format-test via read-back).")
+def scope_set(name, starting_address, ending_address, subnet_mask, router_address,
+              dns_servers, domain_name, dns_updates, dns_ttl, lease_days, ping_check, exclusions) -> None:
+    """Create or update a DHCP scope (POST /api/dhcp/scopes/set). Run scope-enable afterwards."""
+    params: dict[str, Any] = {
+        "name":              name,
+        "startingAddress":   starting_address,
+        "endingAddress":     ending_address,
+        "subnetMask":        subnet_mask,
+        "routerAddress":     router_address,
+        "leaseTimeDays":     str(lease_days),
+        "leaseTimeHours":    "0",
+        "leaseTimeMinutes":  "0",
+        "dnsTtl":            str(dns_ttl),
+        "dnsUpdates":        "true" if dns_updates else "false",
+        "pingCheckEnabled":  "true" if ping_check else "false",
+    }
+    if dns_servers:
+        params["useThisDnsServer"] = "false"
+        params["dnsServers"]       = dns_servers
+    if domain_name:
+        params["domainName"] = domain_name
+    if exclusions:
+        params["exclusions"] = exclusions
+    _api_call("/api/dhcp/scopes/set", params)
+    click.echo(f"OK — scope '{name}' set: {starting_address}–{ending_address} "
+               f"router={router_address} domain={domain_name or '(unchanged)'} dnsUpdates={dns_updates}. "
+               f"Run 'scope-enable {name}' to activate.")
+
+
+@cli.command("scope-enable")
+@click.argument("name")
+def scope_enable(name: str) -> None:
+    """Enable (activate) a DHCP scope."""
+    _api_call("/api/dhcp/scopes/enable", {"name": name})
+    click.echo(f"OK — scope '{name}' enabled")
+
+
+@cli.command("scope-disable")
+@click.argument("name")
+def scope_disable(name: str) -> None:
+    """Disable a DHCP scope (stops serving leases; does not delete it)."""
+    _api_call("/api/dhcp/scopes/disable", {"name": name})
+    click.echo(f"OK — scope '{name}' disabled")
+
+
+@cli.command("scope-delete")
+@click.argument("name")
+def scope_delete(name: str) -> None:
+    """Delete a DHCP scope entirely."""
+    _api_call("/api/dhcp/scopes/delete", {"name": name})
+    click.echo(f"OK — scope '{name}' deleted")
+
+
 @cli.group()
 def lease() -> None:
     """Manage a single DHCP lease."""

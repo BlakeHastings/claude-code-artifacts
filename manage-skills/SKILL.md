@@ -224,6 +224,7 @@ For each skill, run these checks and report as a checklist:
 - [ ] `description` is keyword-rich (more than 10 words)
 - [ ] No orphaned files (every file in the directory is referenced or conventional)
 - [ ] `context: fork` is only used on stateless/research skills (warn if skill body has interactive patterns like "ask the user")
+- [ ] No unscoped world-state claims (version requirements, API behavior, platform compatibility) asserted as permanent fact without a version anchor or "verify before relying on this" caveat
 
 **Script checks (if `scripts/` directory exists):**
 - [ ] `.cs` files have valid `#:` directives at the top (or none if no dependencies)

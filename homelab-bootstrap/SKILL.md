@@ -4,7 +4,9 @@ description: >-
   Reference guide for homelab-platform and homelab-services gotchas,
   known issues, and hard-won fixes. Use when troubleshooting Ansible
   (handler patterns, docker_container idempotency on bind-mount file
-  changes, copy: vs template: for placeholder substitution,
+  changes, docker_container being additive so removing/decommissioning a
+  service needs state: absent or docker rm, copy: vs template: for
+  placeholder substitution,
   ANSIBLE_SSH_AGENT auto for 2.16+, ansible_hostname drift),
   Terraform (bpg/proxmox provider, kenske/technitium provider,
   dns-record CNAME vs A-record, output description interpolation,
@@ -1054,6 +1056,35 @@ manual edit, or previous run already applied the new value), no diff →
 no notify → no restart. For pathological cases (state drift between disk
 and in-memory), add a manual `docker restart <name>` step or run the
 play with `--force-handlers`.
+
+---
+
+## `docker_container` Is Additive: It Never Reaps Containers You Stop Declaring
+
+`community.docker.docker_container` only manages the containers a playbook
+*currently declares*. Delete a container's task (or move the service to a
+different host) and re-running the playbook does **nothing** to the old
+container — it keeps running, orphaned, because nothing references it
+anymore. There is no `state: present` reconcile-the-whole-host semantic
+the way `docker compose down` removes services dropped from the compose
+file. Re-applying config is not a cleanup mechanism.
+
+**Consequence for decommissioning:** "I removed it from the playbook, so
+re-running provisioning will clean the box" is wrong. To actually remove a
+service you have two choices:
+
+- An explicit `state: absent` task (the durable, reproducible option;
+  keep it in the playbook so any future re-provision is self-healing).
+  See the legacy-Playwright cleanup block in
+  `local-inference-infrastructure/ansible/litellm-gateway-setup.yml` for
+  the pattern.
+- A one-off `docker rm -f <name>` over SSH (fast, but not captured in
+  config, so the orphan can reappear if anything ever re-runs the old path).
+
+Watch for **dependency stragglers**: removing `open-webui` and `litellm`
+leaves `litellm-postgres` (their backing DB) running untouched, because it
+was its own `docker_container` task. Always `docker ps -a` after a manual
+removal and reconcile against what the playbook *should* leave behind.
 
 ---
 

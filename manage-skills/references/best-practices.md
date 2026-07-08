@@ -36,7 +36,22 @@
    - **Error handling:** Raise `click.ClickException("message")` for user-facing errors — Click formats and exits cleanly. Use `click.echo(..., err=True)` for stderr output.
    - **Secrets:** See `references/dotnet-scripts.md` for credential storage patterns (keyring for Python, `Devlooped.CredentialManager` for .NET).
 
-7. **Never hardcode secrets.** API keys, tokens, and credentials must never be stored in plaintext. Use `Devlooped.CredentialManager` (NuGet) to store all secrets in the OS credential store (Windows Credential Manager / macOS Keychain / Linux Secret Service). Never put secrets in SKILL.md, reference files, scripts, or `dotnet user-secrets`. See `references/dotnet-scripts.md` for implementation details.
+7. **Write for an unknown future reader.** A skill may not be consulted again for months
+   or years. Before committing any claim, ask: "Will a reader be misled if this is no
+   longer true?" Separate two categories:
+
+   - *Mechanisms* -- how a system works at an architectural or OS level. Stable. Write as
+     direct statements.
+   - *World-state* -- which library version requires what, what a package's behavior is,
+     what versions a platform supports. These decay. Frame them as observations tied to a
+     specific version or time, and point the reader to where they can verify:
+     > "As of faster-whisper 1.x, compute_type must be float16 for CUDA. Verify against
+     > the installed version's release notes before assuming this still holds."
+
+   Avoid bare date anchors ("as of 2025"). They read as stale faster than version anchors.
+   Version-scoped claims at least tell the reader what changed.
+
+8. **Never hardcode secrets.** API keys, tokens, and credentials must never be stored in plaintext. Use `Devlooped.CredentialManager` (NuGet) to store all secrets in the OS credential store (Windows Credential Manager / macOS Keychain / Linux Secret Service). Never put secrets in SKILL.md, reference files, scripts, or `dotnet user-secrets`. See `references/dotnet-scripts.md` for implementation details.
 
 ## Common Patterns
 
@@ -58,6 +73,7 @@
 - **`context: fork` on interactive skills** — Fork loses conversation history. Only use for stateless/research tasks.
 - **Hardcoded secrets** — API keys in files. Always use `Devlooped.CredentialManager`.
 - **Ad-hoc logic that should be scripted** — If Claude is performing the same multi-step data transformation every time, put it in a script.
+- **Unscoped world-state claims** — Writing "library X requires Y" or "this API behaves Z" without tying it to a version. These are traps: they're specific and confident, so readers trust them and skip verification, then get burned when they're stale. Scope every behavioral claim to the version it was observed on.
 
 ## When to Split Into Multiple Files
 

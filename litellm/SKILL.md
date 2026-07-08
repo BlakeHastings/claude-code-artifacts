@@ -34,7 +34,7 @@ If no arguments, summarize available operations and ask what the user needs help
 | Symptom | Likely Cause |
 |---------|-------------|
 | "Not connected to DB!" on login | No `DATABASE_URL` configured; LiteLLM needs Postgres for the admin UI |
-| "Invalid model name" from Anthropic | Model name in config doesn't match what the client sends; check `model_name` vs actual API model ID |
+| "Invalid model name passed in model=X" | The alias the client sent isn't in this key's model list. `GET <gateway>/v1/models` with the key as `Authorization: Bearer` lists the exact aliases available; match `model_name` to one of those |
 | Config changes not taking effect | Container wasn't restarted after config file update on disk |
 | Auth error with Max subscription | Missing `forward_client_headers_to_llm_api: true` in `general_settings` |
 | OTEL export failures in logs | `OTEL_EXPORTER_OTLP_ENDPOINT` has a placeholder IP instead of a real address |

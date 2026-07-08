@@ -2,6 +2,10 @@
 
 Create a new note in the vault from a template.
 
+> **Research papers have their own flow.** If the source is an academic paper (an arXiv link, a DOI, a publisher page, or a PDF the user wants captured), use [capture-research-paper.md](capture-research-paper.md) instead: it downloads the PDF into the vault and embeds it on top of these steps.
+
+> **Check for an existing note before creating.** Especially for reference/website, person, location, and value-titled (address / phone / URL) notes, first search the vault for the same subject or identifier (`obsidian search query="..."` or `obsidian files`, or Grep with an explicit `path`). If a note already exists, for example from a parallel investigation, **augment it instead of creating a duplicate**. Value-titled notes (a domain, an address, a phone number) collide on one filename by design, but a prose-named note (a person, or the same site under a different descriptive name) will silently duplicate. See [the note-locating guidance](../vault-layout.md#locating-notes).
+
 ## Steps
 
 1. **Read the standards** — start with [`references/standards/README.md`](../standards/README.md), then read each component file. This gives you the current aggregate standards version and all the rules the new note must follow.
@@ -40,3 +44,4 @@ Create a new note in the vault from a template.
 
 - Templater plugin is NOT installed in this vault. Core template plugin's `{{date:...}}` syntax only fires on Obsidian-driven template insertion, so when creating notes programmatically via this skill, **manually compute and substitute** the date/time values rather than leaving `{{...}}` placeholders in the file.
 - The lookup script always reflects current vault state — if the user adds a template manually in Obsidian, the script picks it up automatically. **Never hardcode a template list anywhere in the skill.**
+- **Investigation evidence (cross-reference):** when capturing verification or proof during an OSINT dig, follow the osint-investigation skill's "one proof note per entity × source, linked from the entity" convention (its principle 3) rather than bundling multiple subjects into one note. Each captured record is its own atomic proof note (source URL + screenshot/PDF + facts) titled for and linking to the entity it concerns; that entity's own note carries a **Verification / Records** section linking its proof notes.
