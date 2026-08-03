@@ -30,6 +30,7 @@ git clone https://github.com/BlakeHastings/claude-code-artifacts.git ~/.claude/s
 |-------|-------------|
 | `kroger-api` | Interact with the Kroger Public API (products, locations, cart, identity) |
 | `manage-skills` | Create, edit, list, delete, and validate Claude Code skills |
+| `orchestrated-delivery` | Run a project as an orchestrator driving implementation subagents against a GitHub issue backlog, with three-lens review and merge discipline |
 
 ## Hooks
 
