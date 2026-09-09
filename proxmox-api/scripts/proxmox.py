@@ -52,16 +52,42 @@ EXIT_DEP_ERROR = 5
 
 # ── Credential resolution ────────────────────────────────────────────────────────
 
+def _ensure_session_bus() -> None:
+    """Point keyring at the login session's D-Bus when the variable is unset.
+
+    keyring's SecretService backend talks to gnome-keyring/KWallet over the
+    session bus. A tmux pane, an ssh session, or any shell not started by the
+    desktop inherits no DBUS_SESSION_BUS_ADDRESS, so keyring finds no viable
+    backend and raises NoKeyringError -- which reads like "keyring is not
+    installed" but actually means "cannot reach the daemon". The socket is at
+    a predictable path, so fall back to it rather than making the caller
+    export the variable by hand.
+    """
+    if os.environ.get("DBUS_SESSION_BUS_ADDRESS"):
+        return
+    try:
+        sock = f"/run/user/{os.getuid()}/bus"
+    except AttributeError:      # non-POSIX
+        return
+    if os.path.exists(sock):
+        os.environ["DBUS_SESSION_BUS_ADDRESS"] = f"unix:path={sock}"
+
+
 def _keyring_get(key: str) -> str:
+    _ensure_session_bus()
     try:
         import keyring as kr
         value = kr.get_password(KEYRING_SERVICE, key)
         return value or ""
-    except Exception:
+    except Exception as exc:
+        # Distinguish "no stored value" from "keyring unreachable" -- the
+        # second used to look identical to missing credentials.
+        print(f"Warning: keyring unavailable ({type(exc).__name__}: {exc})", file=sys.stderr)
         return ""
 
 
 def _keyring_set(key: str, value: str) -> None:
+    _ensure_session_bus()
     import keyring as kr
     kr.set_password(KEYRING_SERVICE, key, value)
 

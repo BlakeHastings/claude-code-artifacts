@@ -110,3 +110,34 @@ so connections succeed without a trusted CA. If you later configure a valid cert
 | `vm status` | `PVEAuditor` |
 | `vm start`, `vm stop`, `vm shutdown` | `PVEVMUser` |
 | All operations | `Administrator` |
+
+---
+
+## 7. Troubleshooting: `NoKeyringError` on Linux
+
+```
+keyring.errors.NoKeyringError: No recommended backend was available.
+```
+
+This almost never means keyring is missing. It means the process cannot reach
+the desktop secret daemon, because `DBUS_SESSION_BUS_ADDRESS` is unset. Any
+shell not started by the graphical session inherits no session bus: a tmux
+pane, an ssh login, a systemd unit, a terminal reattached after logout. The
+`SecretService` backend then fails its availability probe and keyring falls
+back to `fail.Keyring`, whose only behaviour is to raise this error.
+
+`KeyringLocked: Failed to unlock the collection!` is the same root cause seen
+from a slightly different angle.
+
+The script now recovers on its own — `_ensure_session_bus()` points at
+`/run/user/<uid>/bus` when the variable is unset — so this should not recur.
+To confirm the bus is reachable:
+
+```bash
+ls -l /run/user/$(id -u)/bus              # socket should exist
+export DBUS_SESSION_BUS_ADDRESS=unix:path=/run/user/$(id -u)/bus
+```
+
+If the socket is missing entirely, there is no logged-in desktop session on
+this machine holding an unlocked keyring. Use the `PROXMOX_*` environment
+variables instead, or log in on the console once to start the daemon.
